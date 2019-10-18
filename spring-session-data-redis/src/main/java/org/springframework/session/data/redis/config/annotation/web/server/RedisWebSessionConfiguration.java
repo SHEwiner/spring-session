@@ -16,7 +16,9 @@
 
 package org.springframework.session.data.redis.config.annotation.web.server;
 
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.BeanClassLoaderAware;
 import org.springframework.beans.factory.ObjectProvider;
@@ -36,8 +38,9 @@ import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.session.MapSession;
 import org.springframework.session.SaveMode;
+import org.springframework.session.config.ReactiveSessionRepositoryCustomizer;
 import org.springframework.session.config.annotation.web.server.SpringWebSessionConfiguration;
-import org.springframework.session.data.redis.ReactiveRedisOperationsSessionRepository;
+import org.springframework.session.data.redis.ReactiveRedisSessionRepository;
 import org.springframework.session.data.redis.RedisFlushMode;
 import org.springframework.session.data.redis.config.annotation.SpringSessionRedisConnectionFactory;
 import org.springframework.util.Assert;
@@ -60,7 +63,7 @@ public class RedisWebSessionConfiguration extends SpringWebSessionConfiguration
 
 	private Integer maxInactiveIntervalInSeconds = MapSession.DEFAULT_MAX_INACTIVE_INTERVAL_SECONDS;
 
-	private String redisNamespace = ReactiveRedisOperationsSessionRepository.DEFAULT_NAMESPACE;
+	private String redisNamespace = ReactiveRedisSessionRepository.DEFAULT_NAMESPACE;
 
 	private SaveMode saveMode = SaveMode.ON_SET_ATTRIBUTE;
 
@@ -68,20 +71,23 @@ public class RedisWebSessionConfiguration extends SpringWebSessionConfiguration
 
 	private RedisSerializer<Object> defaultRedisSerializer;
 
+	private List<ReactiveSessionRepositoryCustomizer<ReactiveRedisSessionRepository>> sessionRepositoryCustomizers;
+
 	private ClassLoader classLoader;
 
 	private StringValueResolver embeddedValueResolver;
 
 	@Bean
-	public ReactiveRedisOperationsSessionRepository sessionRepository() {
+	public ReactiveRedisSessionRepository sessionRepository() {
 		ReactiveRedisTemplate<String, Object> reactiveRedisTemplate = createReactiveRedisTemplate();
-		ReactiveRedisOperationsSessionRepository sessionRepository = new ReactiveRedisOperationsSessionRepository(
-				reactiveRedisTemplate);
+		ReactiveRedisSessionRepository sessionRepository = new ReactiveRedisSessionRepository(reactiveRedisTemplate);
 		sessionRepository.setDefaultMaxInactiveInterval(this.maxInactiveIntervalInSeconds);
 		if (StringUtils.hasText(this.redisNamespace)) {
 			sessionRepository.setRedisKeyNamespace(this.redisNamespace);
 		}
 		sessionRepository.setSaveMode(this.saveMode);
+		this.sessionRepositoryCustomizers
+				.forEach((sessionRepositoryCustomizer) -> sessionRepositoryCustomizer.customize(sessionRepository));
 		return sessionRepository;
 	}
 
@@ -118,6 +124,12 @@ public class RedisWebSessionConfiguration extends SpringWebSessionConfiguration
 	@Qualifier("springSessionDefaultRedisSerializer")
 	public void setDefaultRedisSerializer(RedisSerializer<Object> defaultRedisSerializer) {
 		this.defaultRedisSerializer = defaultRedisSerializer;
+	}
+
+	@Autowired(required = false)
+	public void setSessionRepositoryCustomizer(
+			ObjectProvider<ReactiveSessionRepositoryCustomizer<ReactiveRedisSessionRepository>> sessionRepositoryCustomizers) {
+		this.sessionRepositoryCustomizers = sessionRepositoryCustomizers.orderedStream().collect(Collectors.toList());
 	}
 
 	@Override

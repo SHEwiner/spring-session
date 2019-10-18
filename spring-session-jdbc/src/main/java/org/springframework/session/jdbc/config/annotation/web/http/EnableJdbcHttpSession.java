@@ -26,10 +26,13 @@ import javax.sql.DataSource;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.session.FlushMode;
 import org.springframework.session.MapSession;
 import org.springframework.session.SaveMode;
+import org.springframework.session.Session;
+import org.springframework.session.SessionRepository;
 import org.springframework.session.config.annotation.web.http.EnableSpringHttpSession;
-import org.springframework.session.jdbc.JdbcOperationsSessionRepository;
+import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.session.web.http.SessionRepositoryFilter;
 
 /**
@@ -74,7 +77,7 @@ import org.springframework.session.web.http.SessionRepositoryFilter;
 @Target(ElementType.TYPE)
 @Documented
 @Import(JdbcHttpSessionConfiguration.class)
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public @interface EnableJdbcHttpSession {
 
 	/**
@@ -88,7 +91,7 @@ public @interface EnableJdbcHttpSession {
 	 * The name of database table used by Spring Session to store sessions.
 	 * @return the database table name
 	 */
-	String tableName() default JdbcOperationsSessionRepository.DEFAULT_TABLE_NAME;
+	String tableName() default JdbcIndexedSessionRepository.DEFAULT_TABLE_NAME;
 
 	/**
 	 * The cron expression for expired session cleanup job. By default runs every minute.
@@ -96,6 +99,18 @@ public @interface EnableJdbcHttpSession {
 	 * @since 2.0.0
 	 */
 	String cleanupCron() default JdbcHttpSessionConfiguration.DEFAULT_CLEANUP_CRON;
+
+	/**
+	 * Flush mode for the sessions. The default is {@code ON_SAVE} which only updates the
+	 * backing database when {@link SessionRepository#save(Session)} is invoked. In a web
+	 * environment this happens just before the HTTP response is committed.
+	 * <p>
+	 * Setting the value to {@code IMMEDIATE} will ensure that the any updates to the
+	 * Session are immediately written to the database.
+	 * @return the flush mode
+	 * @since 2.2.0
+	 */
+	FlushMode flushMode() default FlushMode.ON_SAVE;
 
 	/**
 	 * Save mode for the session. The default is {@link SaveMode#ON_SET_ATTRIBUTE}, which

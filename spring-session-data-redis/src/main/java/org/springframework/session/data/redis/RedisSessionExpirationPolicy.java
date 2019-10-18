@@ -28,7 +28,7 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.data.redis.core.BoundSetOperations;
 import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.session.Session;
-import org.springframework.session.data.redis.RedisOperationsSessionRepository.RedisSession;
+import org.springframework.session.data.redis.RedisIndexedSessionRepository.RedisSession;
 
 /**
  * A strategy for expiring {@link RedisSession} instances. This performs two operations:
@@ -64,13 +64,13 @@ final class RedisSessionExpirationPolicy {
 		this.lookupSessionKey = lookupSessionKey;
 	}
 
-	public void onDelete(Session session) {
+	void onDelete(Session session) {
 		long toExpire = roundUpToNextMinute(expiresInMillis(session));
 		String expireKey = getExpirationKey(toExpire);
 		this.redis.boundSetOps(expireKey).remove(session.getId());
 	}
 
-	public void onExpirationUpdated(Long originalExpirationTimeInMilli, Session session) {
+	void onExpirationUpdated(Long originalExpirationTimeInMilli, Session session) {
 		String keyToExpire = "expires:" + session.getId();
 		long toExpire = roundUpToNextMinute(expiresInMillis(session));
 
@@ -117,7 +117,7 @@ final class RedisSessionExpirationPolicy {
 		return this.lookupSessionKey.apply(sessionId);
 	}
 
-	public void cleanExpiredSessions() {
+	void cleanExpiredSessions() {
 		long now = System.currentTimeMillis();
 		long prevMin = roundDownMinute(now);
 

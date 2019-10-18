@@ -47,7 +47,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 class AttributeTests {
 
-	private static final String DOCKER_IMAGE = "redis:5.0.5";
+	private static final String DOCKER_IMAGE = "redis:5.0.6";
 
 	@LocalServerPort
 	private int port;
@@ -97,14 +97,14 @@ class AttributeTests {
 	static class Config {
 
 		@Bean
-		public GenericContainer redisContainer() {
+		GenericContainer redisContainer() {
 			GenericContainer redisContainer = new GenericContainer(DOCKER_IMAGE).withExposedPorts(6379);
 			redisContainer.start();
 			return redisContainer;
 		}
 
 		@Bean
-		public LettuceConnectionFactory redisConnectionFactory() {
+		LettuceConnectionFactory redisConnectionFactory() {
 			return new LettuceConnectionFactory(redisContainer().getContainerIpAddress(),
 					redisContainer().getFirstMappedPort());
 		}

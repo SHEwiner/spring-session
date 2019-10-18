@@ -16,12 +16,17 @@
 
 package org.springframework.session.jdbc;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+
+import org.testcontainers.containers.Db2Container;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.MSSQLServerContainer;
 import org.testcontainers.containers.MariaDBContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.containers.OracleContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
 
 /**
  * Factories for various {@link JdbcDatabaseContainer}s.
@@ -31,6 +36,10 @@ import org.testcontainers.containers.PostgreSQLContainer;
 final class DatabaseContainers {
 
 	private DatabaseContainers() {
+	}
+
+	static Db211Container db211() {
+		return new Db211Container();
 	}
 
 	static MariaDBContainer mariaDb5() {
@@ -49,8 +58,8 @@ final class DatabaseContainers {
 		return new MySql8Container();
 	}
 
-	static OracleContainer oracle() {
-		return new OracleContainer();
+	static OracleXeContainer oracleXe() {
+		return new OracleXeContainer();
 	}
 
 	static PostgreSQLContainer postgreSql9() {
@@ -67,6 +76,14 @@ final class DatabaseContainers {
 
 	static MSSQLServerContainer sqlServer2017() {
 		return new SqlServer2017Container();
+	}
+
+	private static class Db211Container extends Db2Container {
+
+		Db211Container() {
+			super("ibmcom/db2:11.5.0.0a");
+		}
+
 	}
 
 	private static class MariaDb5Container extends MariaDBContainer<MariaDb5Container> {
@@ -87,7 +104,7 @@ final class DatabaseContainers {
 	private static class MariaDb10Container extends MariaDBContainer<MariaDb10Container> {
 
 		MariaDb10Container() {
-			super("mariadb:10.3.15");
+			super("mariadb:10.4.8");
 		}
 
 		@Override
@@ -101,7 +118,7 @@ final class DatabaseContainers {
 	private static class MySql5Container extends MySQLContainer<MySql5Container> {
 
 		MySql5Container() {
-			super("mysql:5.7.26");
+			super("mysql:5.7.27");
 		}
 
 		@Override
@@ -120,7 +137,7 @@ final class DatabaseContainers {
 	private static class MySql8Container extends MySQLContainer<MySql8Container> {
 
 		MySql8Container() {
-			super("mysql:8.0.16");
+			super("mysql:8.0.17");
 		}
 
 		@Override
@@ -136,10 +153,28 @@ final class DatabaseContainers {
 
 	}
 
+	private static class OracleXeContainer extends OracleContainer {
+
+		@Override
+		protected void configure() {
+			super.configure();
+			this.waitStrategy = new LogMessageWaitStrategy().withRegEx(".*DATABASE IS READY TO USE!.*\\s")
+					.withStartupTimeout(Duration.of(10, ChronoUnit.MINUTES));
+			setShmSize(1024L * 1024L * 1024L);
+			addEnv("ORACLE_PWD", getPassword());
+		}
+
+		@Override
+		protected void waitUntilContainerStarted() {
+			getWaitStrategy().waitUntilReady(this);
+		}
+
+	}
+
 	private static class PostgreSql9Container extends PostgreSQLContainer<PostgreSql9Container> {
 
 		PostgreSql9Container() {
-			super("postgres:9.6.13");
+			super("postgres:9.6.15");
 		}
 
 	}
@@ -147,7 +182,7 @@ final class DatabaseContainers {
 	private static class PostgreSql10Container extends PostgreSQLContainer<PostgreSql10Container> {
 
 		PostgreSql10Container() {
-			super("postgres:10.8");
+			super("postgres:10.10");
 		}
 
 	}
@@ -155,7 +190,7 @@ final class DatabaseContainers {
 	private static class PostgreSql11Container extends PostgreSQLContainer<PostgreSql11Container> {
 
 		PostgreSql11Container() {
-			super("postgres:11.3");
+			super("postgres:11.5");
 		}
 
 	}
@@ -163,7 +198,7 @@ final class DatabaseContainers {
 	private static class SqlServer2017Container extends MSSQLServerContainer<SqlServer2017Container> {
 
 		SqlServer2017Container() {
-			super("mcr.microsoft.com/mssql/server:2017-CU15");
+			super("mcr.microsoft.com/mssql/server:2017-CU16");
 		}
 
 	}

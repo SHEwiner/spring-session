@@ -27,15 +27,22 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.jdbc.support.lob.LobHandler;
 import org.springframework.mock.env.MockEnvironment;
+import org.springframework.session.FlushMode;
+import org.springframework.session.IndexResolver;
 import org.springframework.session.SaveMode;
-import org.springframework.session.jdbc.JdbcOperationsSessionRepository;
+import org.springframework.session.Session;
+import org.springframework.session.config.SessionRepositoryCustomizer;
+import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.session.jdbc.config.annotation.SpringSessionDataSource;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionOperations;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -46,7 +53,6 @@ import static org.mockito.Mockito.mock;
  *
  * @author Vedran Pavic
  * @author Eddú Meléndez
- * @since 1.2.0
  */
 class JdbcHttpSessionConfigurationTests {
 
@@ -76,14 +82,17 @@ class JdbcHttpSessionConfigurationTests {
 	void defaultConfiguration() {
 		registerAndRefresh(DataSourceConfiguration.class, DefaultConfiguration.class);
 
-		assertThat(this.context.getBean(JdbcOperationsSessionRepository.class)).isNotNull();
+		JdbcIndexedSessionRepository sessionRepository = this.context.getBean(JdbcIndexedSessionRepository.class);
+		assertThat(sessionRepository).isNotNull();
+		assertThat(sessionRepository).extracting("transactionOperations")
+				.hasFieldOrPropertyWithValue("propagationBehavior", TransactionDefinition.PROPAGATION_REQUIRES_NEW);
 	}
 
 	@Test
 	void customTableNameAnnotation() {
 		registerAndRefresh(DataSourceConfiguration.class, CustomTableNameAnnotationConfiguration.class);
 
-		JdbcOperationsSessionRepository repository = this.context.getBean(JdbcOperationsSessionRepository.class);
+		JdbcIndexedSessionRepository repository = this.context.getBean(JdbcIndexedSessionRepository.class);
 		assertThat(repository).isNotNull();
 		assertThat(ReflectionTestUtils.getField(repository, "tableName")).isEqualTo(TABLE_NAME);
 	}
@@ -92,7 +101,7 @@ class JdbcHttpSessionConfigurationTests {
 	void customTableNameSetter() {
 		registerAndRefresh(DataSourceConfiguration.class, CustomTableNameSetterConfiguration.class);
 
-		JdbcOperationsSessionRepository repository = this.context.getBean(JdbcOperationsSessionRepository.class);
+		JdbcIndexedSessionRepository repository = this.context.getBean(JdbcIndexedSessionRepository.class);
 		assertThat(repository).isNotNull();
 		assertThat(ReflectionTestUtils.getField(repository, "tableName")).isEqualTo(TABLE_NAME);
 	}
@@ -102,7 +111,7 @@ class JdbcHttpSessionConfigurationTests {
 		registerAndRefresh(DataSourceConfiguration.class,
 				CustomMaxInactiveIntervalInSecondsAnnotationConfiguration.class);
 
-		JdbcOperationsSessionRepository repository = this.context.getBean(JdbcOperationsSessionRepository.class);
+		JdbcIndexedSessionRepository repository = this.context.getBean(JdbcIndexedSessionRepository.class);
 		assertThat(repository).isNotNull();
 		assertThat(ReflectionTestUtils.getField(repository, "defaultMaxInactiveInterval"))
 				.isEqualTo(MAX_INACTIVE_INTERVAL_IN_SECONDS);
@@ -112,7 +121,7 @@ class JdbcHttpSessionConfigurationTests {
 	void customMaxInactiveIntervalInSecondsSetter() {
 		registerAndRefresh(DataSourceConfiguration.class, CustomMaxInactiveIntervalInSecondsSetterConfiguration.class);
 
-		JdbcOperationsSessionRepository repository = this.context.getBean(JdbcOperationsSessionRepository.class);
+		JdbcIndexedSessionRepository repository = this.context.getBean(JdbcIndexedSessionRepository.class);
 		assertThat(repository).isNotNull();
 		assertThat(ReflectionTestUtils.getField(repository, "defaultMaxInactiveInterval"))
 				.isEqualTo(MAX_INACTIVE_INTERVAL_IN_SECONDS);
@@ -137,6 +146,20 @@ class JdbcHttpSessionConfigurationTests {
 	}
 
 	@Test
+	void customFlushModeAnnotation() {
+		registerAndRefresh(DataSourceConfiguration.class, CustomFlushModeExpressionAnnotationConfiguration.class);
+		assertThat(this.context.getBean(JdbcHttpSessionConfiguration.class)).hasFieldOrPropertyWithValue("flushMode",
+				FlushMode.IMMEDIATE);
+	}
+
+	@Test
+	void customFlushModeSetter() {
+		registerAndRefresh(DataSourceConfiguration.class, CustomFlushModeExpressionSetterConfiguration.class);
+		assertThat(this.context.getBean(JdbcHttpSessionConfiguration.class)).hasFieldOrPropertyWithValue("flushMode",
+				FlushMode.IMMEDIATE);
+	}
+
+	@Test
 	void customSaveModeAnnotation() {
 		registerAndRefresh(DataSourceConfiguration.class, CustomSaveModeExpressionAnnotationConfiguration.class);
 		assertThat(this.context.getBean(JdbcHttpSessionConfiguration.class)).hasFieldOrPropertyWithValue("saveMode",
@@ -154,7 +177,7 @@ class JdbcHttpSessionConfigurationTests {
 	void qualifiedDataSourceConfiguration() {
 		registerAndRefresh(DataSourceConfiguration.class, QualifiedDataSourceConfiguration.class);
 
-		JdbcOperationsSessionRepository repository = this.context.getBean(JdbcOperationsSessionRepository.class);
+		JdbcIndexedSessionRepository repository = this.context.getBean(JdbcIndexedSessionRepository.class);
 		DataSource dataSource = this.context.getBean("qualifiedDataSource", DataSource.class);
 		assertThat(repository).isNotNull();
 		assertThat(dataSource).isNotNull();
@@ -167,7 +190,7 @@ class JdbcHttpSessionConfigurationTests {
 	void primaryDataSourceConfiguration() {
 		registerAndRefresh(DataSourceConfiguration.class, PrimaryDataSourceConfiguration.class);
 
-		JdbcOperationsSessionRepository repository = this.context.getBean(JdbcOperationsSessionRepository.class);
+		JdbcIndexedSessionRepository repository = this.context.getBean(JdbcIndexedSessionRepository.class);
 		DataSource dataSource = this.context.getBean("primaryDataSource", DataSource.class);
 		assertThat(repository).isNotNull();
 		assertThat(dataSource).isNotNull();
@@ -180,7 +203,7 @@ class JdbcHttpSessionConfigurationTests {
 	void qualifiedAndPrimaryDataSourceConfiguration() {
 		registerAndRefresh(DataSourceConfiguration.class, QualifiedAndPrimaryDataSourceConfiguration.class);
 
-		JdbcOperationsSessionRepository repository = this.context.getBean(JdbcOperationsSessionRepository.class);
+		JdbcIndexedSessionRepository repository = this.context.getBean(JdbcIndexedSessionRepository.class);
 		DataSource dataSource = this.context.getBean("qualifiedDataSource", DataSource.class);
 		assertThat(repository).isNotNull();
 		assertThat(dataSource).isNotNull();
@@ -193,7 +216,7 @@ class JdbcHttpSessionConfigurationTests {
 	void namedDataSourceConfiguration() {
 		registerAndRefresh(DataSourceConfiguration.class, NamedDataSourceConfiguration.class);
 
-		JdbcOperationsSessionRepository repository = this.context.getBean(JdbcOperationsSessionRepository.class);
+		JdbcIndexedSessionRepository repository = this.context.getBean(JdbcIndexedSessionRepository.class);
 		DataSource dataSource = this.context.getBean("dataSource", DataSource.class);
 		assertThat(repository).isNotNull();
 		assertThat(dataSource).isNotNull();
@@ -211,10 +234,32 @@ class JdbcHttpSessionConfigurationTests {
 	}
 
 	@Test
+	void customTransactionOperationsConfiguration() {
+		registerAndRefresh(DataSourceConfiguration.class, CustomTransactionOperationsConfiguration.class);
+
+		JdbcIndexedSessionRepository repository = this.context.getBean(JdbcIndexedSessionRepository.class);
+		TransactionOperations transactionOperations = this.context.getBean(TransactionOperations.class);
+		assertThat(repository).isNotNull();
+		assertThat(transactionOperations).isNotNull();
+		assertThat(repository).hasFieldOrPropertyWithValue("transactionOperations", transactionOperations);
+	}
+
+	@Test
+	void customIndexResolverConfiguration() {
+		registerAndRefresh(DataSourceConfiguration.class, CustomIndexResolverConfiguration.class);
+		JdbcIndexedSessionRepository repository = this.context.getBean(JdbcIndexedSessionRepository.class);
+		@SuppressWarnings("unchecked")
+		IndexResolver<Session> indexResolver = this.context.getBean(IndexResolver.class);
+		assertThat(repository).isNotNull();
+		assertThat(indexResolver).isNotNull();
+		assertThat(repository).hasFieldOrPropertyWithValue("indexResolver", indexResolver);
+	}
+
+	@Test
 	void customLobHandlerConfiguration() {
 		registerAndRefresh(DataSourceConfiguration.class, CustomLobHandlerConfiguration.class);
 
-		JdbcOperationsSessionRepository repository = this.context.getBean(JdbcOperationsSessionRepository.class);
+		JdbcIndexedSessionRepository repository = this.context.getBean(JdbcIndexedSessionRepository.class);
 		LobHandler lobHandler = this.context.getBean(LobHandler.class);
 		assertThat(repository).isNotNull();
 		assertThat(lobHandler).isNotNull();
@@ -225,7 +270,7 @@ class JdbcHttpSessionConfigurationTests {
 	void customConversionServiceConfiguration() {
 		registerAndRefresh(DataSourceConfiguration.class, CustomConversionServiceConfiguration.class);
 
-		JdbcOperationsSessionRepository repository = this.context.getBean(JdbcOperationsSessionRepository.class);
+		JdbcIndexedSessionRepository repository = this.context.getBean(JdbcIndexedSessionRepository.class);
 		ConversionService conversionService = this.context.getBean("springSessionConversionService",
 				ConversionService.class);
 		assertThat(repository).isNotNull();
@@ -243,6 +288,14 @@ class JdbcHttpSessionConfigurationTests {
 		assertThat(ReflectionTestUtils.getField(configuration, "tableName")).isEqualTo("custom_session_table");
 	}
 
+	@Test
+	void sessionRepositoryCustomizer() {
+		registerAndRefresh(DataSourceConfiguration.class, SessionRepositoryCustomizerConfiguration.class);
+		JdbcIndexedSessionRepository sessionRepository = this.context.getBean(JdbcIndexedSessionRepository.class);
+		assertThat(sessionRepository).hasFieldOrPropertyWithValue("defaultMaxInactiveInterval",
+				MAX_INACTIVE_INTERVAL_IN_SECONDS);
+	}
+
 	private void registerAndRefresh(Class<?>... annotatedClasses) {
 		this.context.register(annotatedClasses);
 		this.context.refresh();
@@ -257,12 +310,12 @@ class JdbcHttpSessionConfigurationTests {
 	static class DataSourceConfiguration {
 
 		@Bean
-		public DataSource defaultDataSource() {
+		DataSource defaultDataSource() {
 			return mock(DataSource.class);
 		}
 
 		@Bean
-		public PlatformTransactionManager transactionManager() {
+		PlatformTransactionManager transactionManager() {
 			return mock(PlatformTransactionManager.class);
 		}
 
@@ -315,6 +368,20 @@ class JdbcHttpSessionConfigurationTests {
 
 	}
 
+	@EnableJdbcHttpSession(flushMode = FlushMode.IMMEDIATE)
+	static class CustomFlushModeExpressionAnnotationConfiguration {
+
+	}
+
+	@Configuration
+	static class CustomFlushModeExpressionSetterConfiguration extends JdbcHttpSessionConfiguration {
+
+		CustomFlushModeExpressionSetterConfiguration() {
+			setFlushMode(FlushMode.IMMEDIATE);
+		}
+
+	}
+
 	@EnableJdbcHttpSession(saveMode = SaveMode.ALWAYS)
 	static class CustomSaveModeExpressionAnnotationConfiguration {
 
@@ -334,7 +401,7 @@ class JdbcHttpSessionConfigurationTests {
 
 		@Bean
 		@SpringSessionDataSource
-		public DataSource qualifiedDataSource() {
+		DataSource qualifiedDataSource() {
 			return mock(DataSource.class);
 		}
 
@@ -345,7 +412,7 @@ class JdbcHttpSessionConfigurationTests {
 
 		@Bean
 		@Primary
-		public DataSource primaryDataSource() {
+		DataSource primaryDataSource() {
 			return mock(DataSource.class);
 		}
 
@@ -356,13 +423,13 @@ class JdbcHttpSessionConfigurationTests {
 
 		@Bean
 		@SpringSessionDataSource
-		public DataSource qualifiedDataSource() {
+		DataSource qualifiedDataSource() {
 			return mock(DataSource.class);
 		}
 
 		@Bean
 		@Primary
-		public DataSource primaryDataSource() {
+		DataSource primaryDataSource() {
 			return mock(DataSource.class);
 		}
 
@@ -372,7 +439,7 @@ class JdbcHttpSessionConfigurationTests {
 	static class NamedDataSourceConfiguration {
 
 		@Bean
-		public DataSource dataSource() {
+		DataSource dataSource() {
 			return mock(DataSource.class);
 		}
 
@@ -382,8 +449,29 @@ class JdbcHttpSessionConfigurationTests {
 	static class MultipleDataSourceConfiguration {
 
 		@Bean
-		public DataSource secondaryDataSource() {
+		DataSource secondaryDataSource() {
 			return mock(DataSource.class);
+		}
+
+	}
+
+	@EnableJdbcHttpSession
+	static class CustomTransactionOperationsConfiguration {
+
+		@Bean
+		TransactionOperations springSessionTransactionOperations() {
+			return TransactionOperations.withoutTransaction();
+		}
+
+	}
+
+	@EnableJdbcHttpSession
+	static class CustomIndexResolverConfiguration {
+
+		@Bean
+		@SuppressWarnings("unchecked")
+		IndexResolver<Session> indexResolver() {
+			return mock(IndexResolver.class);
 		}
 
 	}
@@ -392,7 +480,7 @@ class JdbcHttpSessionConfigurationTests {
 	static class CustomLobHandlerConfiguration {
 
 		@Bean
-		public LobHandler springSessionLobHandler() {
+		LobHandler springSessionLobHandler() {
 			return mock(LobHandler.class);
 		}
 
@@ -402,7 +490,7 @@ class JdbcHttpSessionConfigurationTests {
 	static class CustomConversionServiceConfiguration {
 
 		@Bean
-		public ConversionService springSessionConversionService() {
+		ConversionService springSessionConversionService() {
 			return mock(ConversionService.class);
 		}
 
@@ -412,8 +500,26 @@ class JdbcHttpSessionConfigurationTests {
 	static class CustomJdbcHttpSessionConfiguration {
 
 		@Bean
-		public PropertySourcesPlaceholderConfigurer propertySourcesPlaceholderConfigurer() {
+		PropertySourcesPlaceholderConfigurer propertySourcesPlaceholderConfigurer() {
 			return new PropertySourcesPlaceholderConfigurer();
+		}
+
+	}
+
+	@EnableJdbcHttpSession
+	static class SessionRepositoryCustomizerConfiguration {
+
+		@Bean
+		@Order(0)
+		SessionRepositoryCustomizer<JdbcIndexedSessionRepository> sessionRepositoryCustomizerOne() {
+			return (sessionRepository) -> sessionRepository.setDefaultMaxInactiveInterval(0);
+		}
+
+		@Bean
+		@Order(1)
+		SessionRepositoryCustomizer<JdbcIndexedSessionRepository> sessionRepositoryCustomizerTwo() {
+			return (sessionRepository) -> sessionRepository
+					.setDefaultMaxInactiveInterval(MAX_INACTIVE_INTERVAL_IN_SECONDS);
 		}
 
 	}

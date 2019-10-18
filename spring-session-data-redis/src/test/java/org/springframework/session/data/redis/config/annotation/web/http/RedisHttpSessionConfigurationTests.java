@@ -29,15 +29,19 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
+import org.springframework.core.annotation.Order;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.session.FlushMode;
+import org.springframework.session.IndexResolver;
 import org.springframework.session.SaveMode;
+import org.springframework.session.Session;
+import org.springframework.session.config.SessionRepositoryCustomizer;
 import org.springframework.session.data.redis.RedisFlushMode;
-import org.springframework.session.data.redis.RedisOperationsSessionRepository;
+import org.springframework.session.data.redis.RedisIndexedSessionRepository;
 import org.springframework.session.data.redis.config.annotation.SpringSessionRedisConnectionFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -55,6 +59,8 @@ import static org.mockito.Mockito.mock;
  * @author Vedran Pavic
  */
 class RedisHttpSessionConfigurationTests {
+
+	private static final int MAX_INACTIVE_INTERVAL_IN_SECONDS = 600;
 
 	private static final String CLEANUP_CRON_EXPRESSION = "0 0 * * * *";
 
@@ -92,8 +98,7 @@ class RedisHttpSessionConfigurationTests {
 	@Test
 	void customFlushImmediately() {
 		registerAndRefresh(RedisConfig.class, CustomFlushImmediatelyConfiguration.class);
-		RedisOperationsSessionRepository sessionRepository = this.context
-				.getBean(RedisOperationsSessionRepository.class);
+		RedisIndexedSessionRepository sessionRepository = this.context.getBean(RedisIndexedSessionRepository.class);
 		assertThat(sessionRepository).isNotNull();
 		assertThat(ReflectionTestUtils.getField(sessionRepository, "flushMode")).isEqualTo(FlushMode.IMMEDIATE);
 	}
@@ -101,8 +106,7 @@ class RedisHttpSessionConfigurationTests {
 	@Test
 	void customFlushImmediatelyLegacy() {
 		registerAndRefresh(RedisConfig.class, CustomFlushImmediatelyLegacyConfiguration.class);
-		RedisOperationsSessionRepository sessionRepository = this.context
-				.getBean(RedisOperationsSessionRepository.class);
+		RedisIndexedSessionRepository sessionRepository = this.context.getBean(RedisIndexedSessionRepository.class);
 		assertThat(sessionRepository).isNotNull();
 		assertThat(ReflectionTestUtils.getField(sessionRepository, "flushMode")).isEqualTo(FlushMode.IMMEDIATE);
 	}
@@ -110,8 +114,7 @@ class RedisHttpSessionConfigurationTests {
 	@Test
 	void setCustomFlushImmediately() {
 		registerAndRefresh(RedisConfig.class, CustomFlushImmediatelySetConfiguration.class);
-		RedisOperationsSessionRepository sessionRepository = this.context
-				.getBean(RedisOperationsSessionRepository.class);
+		RedisIndexedSessionRepository sessionRepository = this.context.getBean(RedisIndexedSessionRepository.class);
 		assertThat(sessionRepository).isNotNull();
 		assertThat(ReflectionTestUtils.getField(sessionRepository, "flushMode")).isEqualTo(FlushMode.IMMEDIATE);
 	}
@@ -119,8 +122,7 @@ class RedisHttpSessionConfigurationTests {
 	@Test
 	void setCustomFlushImmediatelyLegacy() {
 		registerAndRefresh(RedisConfig.class, CustomFlushImmediatelySetLegacyConfiguration.class);
-		RedisOperationsSessionRepository sessionRepository = this.context
-				.getBean(RedisOperationsSessionRepository.class);
+		RedisIndexedSessionRepository sessionRepository = this.context.getBean(RedisIndexedSessionRepository.class);
 		assertThat(sessionRepository).isNotNull();
 		assertThat(ReflectionTestUtils.getField(sessionRepository, "flushMode")).isEqualTo(FlushMode.IMMEDIATE);
 	}
@@ -146,14 +148,14 @@ class RedisHttpSessionConfigurationTests {
 	@Test
 	void customSaveModeAnnotation() {
 		registerAndRefresh(RedisConfig.class, CustomSaveModeExpressionAnnotationConfiguration.class);
-		assertThat(this.context.getBean(RedisOperationsSessionRepository.class)).hasFieldOrPropertyWithValue("saveMode",
+		assertThat(this.context.getBean(RedisIndexedSessionRepository.class)).hasFieldOrPropertyWithValue("saveMode",
 				SaveMode.ALWAYS);
 	}
 
 	@Test
 	void customSaveModeSetter() {
 		registerAndRefresh(RedisConfig.class, CustomSaveModeExpressionSetterConfiguration.class);
-		assertThat(this.context.getBean(RedisOperationsSessionRepository.class)).hasFieldOrPropertyWithValue("saveMode",
+		assertThat(this.context.getBean(RedisIndexedSessionRepository.class)).hasFieldOrPropertyWithValue("saveMode",
 				SaveMode.ALWAYS);
 	}
 
@@ -161,7 +163,7 @@ class RedisHttpSessionConfigurationTests {
 	void qualifiedConnectionFactoryRedisConfig() {
 		registerAndRefresh(RedisConfig.class, QualifiedConnectionFactoryRedisConfig.class);
 
-		RedisOperationsSessionRepository repository = this.context.getBean(RedisOperationsSessionRepository.class);
+		RedisIndexedSessionRepository repository = this.context.getBean(RedisIndexedSessionRepository.class);
 		RedisConnectionFactory redisConnectionFactory = this.context.getBean("qualifiedRedisConnectionFactory",
 				RedisConnectionFactory.class);
 		assertThat(repository).isNotNull();
@@ -177,7 +179,7 @@ class RedisHttpSessionConfigurationTests {
 	void primaryConnectionFactoryRedisConfig() {
 		registerAndRefresh(RedisConfig.class, PrimaryConnectionFactoryRedisConfig.class);
 
-		RedisOperationsSessionRepository repository = this.context.getBean(RedisOperationsSessionRepository.class);
+		RedisIndexedSessionRepository repository = this.context.getBean(RedisIndexedSessionRepository.class);
 		RedisConnectionFactory redisConnectionFactory = this.context.getBean("primaryRedisConnectionFactory",
 				RedisConnectionFactory.class);
 		assertThat(repository).isNotNull();
@@ -193,7 +195,7 @@ class RedisHttpSessionConfigurationTests {
 	void qualifiedAndPrimaryConnectionFactoryRedisConfig() {
 		registerAndRefresh(RedisConfig.class, QualifiedAndPrimaryConnectionFactoryRedisConfig.class);
 
-		RedisOperationsSessionRepository repository = this.context.getBean(RedisOperationsSessionRepository.class);
+		RedisIndexedSessionRepository repository = this.context.getBean(RedisIndexedSessionRepository.class);
 		RedisConnectionFactory redisConnectionFactory = this.context.getBean("qualifiedRedisConnectionFactory",
 				RedisConnectionFactory.class);
 		assertThat(repository).isNotNull();
@@ -209,7 +211,7 @@ class RedisHttpSessionConfigurationTests {
 	void namedConnectionFactoryRedisConfig() {
 		registerAndRefresh(RedisConfig.class, NamedConnectionFactoryRedisConfig.class);
 
-		RedisOperationsSessionRepository repository = this.context.getBean(RedisOperationsSessionRepository.class);
+		RedisIndexedSessionRepository repository = this.context.getBean(RedisIndexedSessionRepository.class);
 		RedisConnectionFactory redisConnectionFactory = this.context.getBean("redisConnectionFactory",
 				RedisConnectionFactory.class);
 		assertThat(repository).isNotNull();
@@ -228,6 +230,17 @@ class RedisHttpSessionConfigurationTests {
 				.withMessageContaining("expected single matching bean but found 2");
 	}
 
+	@Test
+	void customIndexResolverConfiguration() {
+		registerAndRefresh(RedisConfig.class, CustomIndexResolverConfiguration.class);
+		RedisIndexedSessionRepository repository = this.context.getBean(RedisIndexedSessionRepository.class);
+		@SuppressWarnings("unchecked")
+		IndexResolver<Session> indexResolver = this.context.getBean(IndexResolver.class);
+		assertThat(repository).isNotNull();
+		assertThat(indexResolver).isNotNull();
+		assertThat(repository).hasFieldOrPropertyWithValue("indexResolver", indexResolver);
+	}
+
 	@Test // gh-1252
 	void customRedisMessageListenerContainerConfig() {
 		registerAndRefresh(RedisConfig.class, CustomRedisMessageListenerContainerConfig.class);
@@ -235,6 +248,14 @@ class RedisHttpSessionConfigurationTests {
 				.getBeansOfType(RedisMessageListenerContainer.class);
 		assertThat(beans).hasSize(2);
 		assertThat(beans).containsKeys("springSessionRedisMessageListenerContainer", "redisMessageListenerContainer");
+	}
+
+	@Test
+	void sessionRepositoryCustomizer() {
+		registerAndRefresh(RedisConfig.class, SessionRepositoryCustomizerConfiguration.class);
+		RedisIndexedSessionRepository sessionRepository = this.context.getBean(RedisIndexedSessionRepository.class);
+		assertThat(sessionRepository).hasFieldOrPropertyWithValue("defaultMaxInactiveInterval",
+				MAX_INACTIVE_INTERVAL_IN_SECONDS);
 	}
 
 	private void registerAndRefresh(Class<?>... annotatedClasses) {
@@ -254,7 +275,7 @@ class RedisHttpSessionConfigurationTests {
 	static class PropertySourceConfiguration {
 
 		@Bean
-		public PropertySourcesPlaceholderConfigurer propertySourcesPlaceholderConfigurer() {
+		PropertySourcesPlaceholderConfigurer propertySourcesPlaceholderConfigurer() {
 			return new PropertySourcesPlaceholderConfigurer();
 		}
 
@@ -264,7 +285,7 @@ class RedisHttpSessionConfigurationTests {
 	static class RedisConfig {
 
 		@Bean
-		public RedisConnectionFactory defaultRedisConnectionFactory() {
+		RedisConnectionFactory defaultRedisConnectionFactory() {
 			return mockRedisConnectionFactory();
 		}
 
@@ -280,6 +301,7 @@ class RedisHttpSessionConfigurationTests {
 	}
 
 	@Configuration
+	@SuppressWarnings("deprecation")
 	static class CustomFlushImmediatelySetLegacyConfiguration extends RedisHttpSessionConfiguration {
 
 		CustomFlushImmediatelySetLegacyConfiguration() {
@@ -296,6 +318,7 @@ class RedisHttpSessionConfigurationTests {
 
 	@Configuration
 	@EnableRedisHttpSession(redisFlushMode = RedisFlushMode.IMMEDIATE)
+	@SuppressWarnings("deprecation")
 	static class CustomFlushImmediatelyLegacyConfiguration {
 
 	}
@@ -334,7 +357,7 @@ class RedisHttpSessionConfigurationTests {
 
 		@Bean
 		@SpringSessionRedisConnectionFactory
-		public RedisConnectionFactory qualifiedRedisConnectionFactory() {
+		RedisConnectionFactory qualifiedRedisConnectionFactory() {
 			return mockRedisConnectionFactory();
 		}
 
@@ -346,7 +369,7 @@ class RedisHttpSessionConfigurationTests {
 
 		@Bean
 		@Primary
-		public RedisConnectionFactory primaryRedisConnectionFactory() {
+		RedisConnectionFactory primaryRedisConnectionFactory() {
 			return mockRedisConnectionFactory();
 		}
 
@@ -358,13 +381,13 @@ class RedisHttpSessionConfigurationTests {
 
 		@Bean
 		@SpringSessionRedisConnectionFactory
-		public RedisConnectionFactory qualifiedRedisConnectionFactory() {
+		RedisConnectionFactory qualifiedRedisConnectionFactory() {
 			return mockRedisConnectionFactory();
 		}
 
 		@Bean
 		@Primary
-		public RedisConnectionFactory primaryRedisConnectionFactory() {
+		RedisConnectionFactory primaryRedisConnectionFactory() {
 			return mockRedisConnectionFactory();
 		}
 
@@ -375,7 +398,7 @@ class RedisHttpSessionConfigurationTests {
 	static class NamedConnectionFactoryRedisConfig {
 
 		@Bean
-		public RedisConnectionFactory redisConnectionFactory() {
+		RedisConnectionFactory redisConnectionFactory() {
 			return mockRedisConnectionFactory();
 		}
 
@@ -386,7 +409,7 @@ class RedisHttpSessionConfigurationTests {
 	static class MultipleConnectionFactoryRedisConfig {
 
 		@Bean
-		public RedisConnectionFactory secondaryRedisConnectionFactory() {
+		RedisConnectionFactory secondaryRedisConnectionFactory() {
 			return mockRedisConnectionFactory();
 		}
 
@@ -406,11 +429,41 @@ class RedisHttpSessionConfigurationTests {
 
 	@Configuration
 	@EnableRedisHttpSession
+	static class CustomIndexResolverConfiguration {
+
+		@Bean
+		@SuppressWarnings("unchecked")
+		IndexResolver<Session> indexResolver() {
+			return mock(IndexResolver.class);
+		}
+
+	}
+
+	@Configuration
+	@EnableRedisHttpSession
 	static class CustomRedisMessageListenerContainerConfig {
 
 		@Bean
-		public RedisMessageListenerContainer redisMessageListenerContainer() {
+		RedisMessageListenerContainer redisMessageListenerContainer() {
 			return new RedisMessageListenerContainer();
+		}
+
+	}
+
+	@EnableRedisHttpSession
+	static class SessionRepositoryCustomizerConfiguration {
+
+		@Bean
+		@Order(0)
+		SessionRepositoryCustomizer<RedisIndexedSessionRepository> sessionRepositoryCustomizerOne() {
+			return (sessionRepository) -> sessionRepository.setDefaultMaxInactiveInterval(0);
+		}
+
+		@Bean
+		@Order(1)
+		SessionRepositoryCustomizer<RedisIndexedSessionRepository> sessionRepositoryCustomizerTwo() {
+			return (sessionRepository) -> sessionRepository
+					.setDefaultMaxInactiveInterval(MAX_INACTIVE_INTERVAL_IN_SECONDS);
 		}
 
 	}

@@ -25,12 +25,14 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.annotation.Order;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.core.ReactiveRedisOperations;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.session.SaveMode;
-import org.springframework.session.data.redis.ReactiveRedisOperationsSessionRepository;
+import org.springframework.session.config.ReactiveSessionRepositoryCustomizer;
+import org.springframework.session.data.redis.ReactiveRedisSessionRepository;
 import org.springframework.session.data.redis.config.annotation.SpringSessionRedisConnectionFactory;
 import org.springframework.session.data.redis.config.annotation.SpringSessionRedisOperations;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -68,8 +70,7 @@ class RedisWebSessionConfigurationTests {
 	void defaultConfiguration() {
 		registerAndRefresh(RedisConfig.class, DefaultConfig.class);
 
-		ReactiveRedisOperationsSessionRepository repository = this.context
-				.getBean(ReactiveRedisOperationsSessionRepository.class);
+		ReactiveRedisSessionRepository repository = this.context.getBean(ReactiveRedisSessionRepository.class);
 		assertThat(repository).isNotNull();
 	}
 
@@ -77,8 +78,7 @@ class RedisWebSessionConfigurationTests {
 	void springSessionRedisOperationsResolvingConfiguration() {
 		registerAndRefresh(RedisConfig.class, SpringSessionRedisOperationsResolvingConfig.class);
 
-		ReactiveRedisOperationsSessionRepository repository = this.context
-				.getBean(ReactiveRedisOperationsSessionRepository.class);
+		ReactiveRedisSessionRepository repository = this.context.getBean(ReactiveRedisSessionRepository.class);
 		assertThat(repository).isNotNull();
 		ReactiveRedisOperations<String, Object> springSessionRedisOperations = this.context
 				.getBean(SpringSessionRedisOperationsResolvingConfig.class).getSpringSessionRedisOperations();
@@ -91,8 +91,7 @@ class RedisWebSessionConfigurationTests {
 	void customNamespace() {
 		registerAndRefresh(RedisConfig.class, CustomNamespaceConfig.class);
 
-		ReactiveRedisOperationsSessionRepository repository = this.context
-				.getBean(ReactiveRedisOperationsSessionRepository.class);
+		ReactiveRedisSessionRepository repository = this.context.getBean(ReactiveRedisSessionRepository.class);
 		assertThat(repository).isNotNull();
 		assertThat(ReflectionTestUtils.getField(repository, "namespace")).isEqualTo(REDIS_NAMESPACE + ":");
 	}
@@ -101,8 +100,7 @@ class RedisWebSessionConfigurationTests {
 	void customMaxInactiveInterval() {
 		registerAndRefresh(RedisConfig.class, CustomMaxInactiveIntervalConfig.class);
 
-		ReactiveRedisOperationsSessionRepository repository = this.context
-				.getBean(ReactiveRedisOperationsSessionRepository.class);
+		ReactiveRedisSessionRepository repository = this.context.getBean(ReactiveRedisSessionRepository.class);
 		assertThat(repository).isNotNull();
 		assertThat(ReflectionTestUtils.getField(repository, "defaultMaxInactiveInterval"))
 				.isEqualTo(MAX_INACTIVE_INTERVAL_IN_SECONDS);
@@ -111,23 +109,22 @@ class RedisWebSessionConfigurationTests {
 	@Test
 	void customSaveModeAnnotation() {
 		registerAndRefresh(RedisConfig.class, CustomSaveModeExpressionAnnotationConfiguration.class);
-		assertThat(this.context.getBean(ReactiveRedisOperationsSessionRepository.class))
-				.hasFieldOrPropertyWithValue("saveMode", SaveMode.ALWAYS);
+		assertThat(this.context.getBean(ReactiveRedisSessionRepository.class)).hasFieldOrPropertyWithValue("saveMode",
+				SaveMode.ALWAYS);
 	}
 
 	@Test
 	void customSaveModeSetter() {
 		registerAndRefresh(RedisConfig.class, CustomSaveModeExpressionSetterConfiguration.class);
-		assertThat(this.context.getBean(ReactiveRedisOperationsSessionRepository.class))
-				.hasFieldOrPropertyWithValue("saveMode", SaveMode.ALWAYS);
+		assertThat(this.context.getBean(ReactiveRedisSessionRepository.class)).hasFieldOrPropertyWithValue("saveMode",
+				SaveMode.ALWAYS);
 	}
 
 	@Test
 	void qualifiedConnectionFactoryRedisConfig() {
 		registerAndRefresh(RedisConfig.class, QualifiedConnectionFactoryRedisConfig.class);
 
-		ReactiveRedisOperationsSessionRepository repository = this.context
-				.getBean(ReactiveRedisOperationsSessionRepository.class);
+		ReactiveRedisSessionRepository repository = this.context.getBean(ReactiveRedisSessionRepository.class);
 		ReactiveRedisConnectionFactory redisConnectionFactory = this.context.getBean("qualifiedRedisConnectionFactory",
 				ReactiveRedisConnectionFactory.class);
 		assertThat(repository).isNotNull();
@@ -143,8 +140,7 @@ class RedisWebSessionConfigurationTests {
 	void primaryConnectionFactoryRedisConfig() {
 		registerAndRefresh(RedisConfig.class, PrimaryConnectionFactoryRedisConfig.class);
 
-		ReactiveRedisOperationsSessionRepository repository = this.context
-				.getBean(ReactiveRedisOperationsSessionRepository.class);
+		ReactiveRedisSessionRepository repository = this.context.getBean(ReactiveRedisSessionRepository.class);
 		ReactiveRedisConnectionFactory redisConnectionFactory = this.context.getBean("primaryRedisConnectionFactory",
 				ReactiveRedisConnectionFactory.class);
 		assertThat(repository).isNotNull();
@@ -160,8 +156,7 @@ class RedisWebSessionConfigurationTests {
 	void qualifiedAndPrimaryConnectionFactoryRedisConfig() {
 		registerAndRefresh(RedisConfig.class, QualifiedAndPrimaryConnectionFactoryRedisConfig.class);
 
-		ReactiveRedisOperationsSessionRepository repository = this.context
-				.getBean(ReactiveRedisOperationsSessionRepository.class);
+		ReactiveRedisSessionRepository repository = this.context.getBean(ReactiveRedisSessionRepository.class);
 		ReactiveRedisConnectionFactory redisConnectionFactory = this.context.getBean("qualifiedRedisConnectionFactory",
 				ReactiveRedisConnectionFactory.class);
 		assertThat(repository).isNotNull();
@@ -177,8 +172,7 @@ class RedisWebSessionConfigurationTests {
 	void namedConnectionFactoryRedisConfig() {
 		registerAndRefresh(RedisConfig.class, NamedConnectionFactoryRedisConfig.class);
 
-		ReactiveRedisOperationsSessionRepository repository = this.context
-				.getBean(ReactiveRedisOperationsSessionRepository.class);
+		ReactiveRedisSessionRepository repository = this.context.getBean(ReactiveRedisSessionRepository.class);
 		ReactiveRedisConnectionFactory redisConnectionFactory = this.context.getBean("redisConnectionFactory",
 				ReactiveRedisConnectionFactory.class);
 		assertThat(repository).isNotNull();
@@ -198,12 +192,11 @@ class RedisWebSessionConfigurationTests {
 	}
 
 	@Test
-	@SuppressWarnings("unchecked")
 	void customRedisSerializerConfig() {
 		registerAndRefresh(RedisConfig.class, CustomRedisSerializerConfig.class);
 
-		ReactiveRedisOperationsSessionRepository repository = this.context
-				.getBean(ReactiveRedisOperationsSessionRepository.class);
+		ReactiveRedisSessionRepository repository = this.context.getBean(ReactiveRedisSessionRepository.class);
+		@SuppressWarnings("unchecked")
 		RedisSerializer<Object> redisSerializer = this.context.getBean("springSessionDefaultRedisSerializer",
 				RedisSerializer.class);
 		assertThat(repository).isNotNull();
@@ -222,6 +215,14 @@ class RedisWebSessionConfigurationTests {
 				"serializer")).isEqualTo(redisSerializer);
 	}
 
+	@Test
+	void sessionRepositoryCustomizer() {
+		registerAndRefresh(RedisConfig.class, SessionRepositoryCustomizerConfiguration.class);
+		ReactiveRedisSessionRepository sessionRepository = this.context.getBean(ReactiveRedisSessionRepository.class);
+		assertThat(sessionRepository).hasFieldOrPropertyWithValue("defaultMaxInactiveInterval",
+				MAX_INACTIVE_INTERVAL_IN_SECONDS);
+	}
+
 	private void registerAndRefresh(Class<?>... annotatedClasses) {
 		this.context.register(annotatedClasses);
 		this.context.refresh();
@@ -231,7 +232,7 @@ class RedisWebSessionConfigurationTests {
 	static class RedisConfig {
 
 		@Bean
-		public ReactiveRedisConnectionFactory defaultRedisConnectionFactory() {
+		ReactiveRedisConnectionFactory defaultRedisConnectionFactory() {
 			return mock(ReactiveRedisConnectionFactory.class);
 		}
 
@@ -283,7 +284,7 @@ class RedisWebSessionConfigurationTests {
 
 		@Bean
 		@SpringSessionRedisConnectionFactory
-		public ReactiveRedisConnectionFactory qualifiedRedisConnectionFactory() {
+		ReactiveRedisConnectionFactory qualifiedRedisConnectionFactory() {
 			return mock(ReactiveRedisConnectionFactory.class);
 		}
 
@@ -294,7 +295,7 @@ class RedisWebSessionConfigurationTests {
 
 		@Bean
 		@Primary
-		public ReactiveRedisConnectionFactory primaryRedisConnectionFactory() {
+		ReactiveRedisConnectionFactory primaryRedisConnectionFactory() {
 			return mock(ReactiveRedisConnectionFactory.class);
 		}
 
@@ -305,13 +306,13 @@ class RedisWebSessionConfigurationTests {
 
 		@Bean
 		@SpringSessionRedisConnectionFactory
-		public ReactiveRedisConnectionFactory qualifiedRedisConnectionFactory() {
+		ReactiveRedisConnectionFactory qualifiedRedisConnectionFactory() {
 			return mock(ReactiveRedisConnectionFactory.class);
 		}
 
 		@Bean
 		@Primary
-		public ReactiveRedisConnectionFactory primaryRedisConnectionFactory() {
+		ReactiveRedisConnectionFactory primaryRedisConnectionFactory() {
 			return mock(ReactiveRedisConnectionFactory.class);
 		}
 
@@ -321,7 +322,7 @@ class RedisWebSessionConfigurationTests {
 	static class NamedConnectionFactoryRedisConfig {
 
 		@Bean
-		public ReactiveRedisConnectionFactory redisConnectionFactory() {
+		ReactiveRedisConnectionFactory redisConnectionFactory() {
 			return mock(ReactiveRedisConnectionFactory.class);
 		}
 
@@ -331,7 +332,7 @@ class RedisWebSessionConfigurationTests {
 	static class MultipleConnectionFactoryRedisConfig {
 
 		@Bean
-		public ReactiveRedisConnectionFactory secondaryRedisConnectionFactory() {
+		ReactiveRedisConnectionFactory secondaryRedisConnectionFactory() {
 			return mock(ReactiveRedisConnectionFactory.class);
 		}
 
@@ -342,8 +343,26 @@ class RedisWebSessionConfigurationTests {
 
 		@Bean
 		@SuppressWarnings("unchecked")
-		public RedisSerializer<Object> springSessionDefaultRedisSerializer() {
+		RedisSerializer<Object> springSessionDefaultRedisSerializer() {
 			return mock(RedisSerializer.class);
+		}
+
+	}
+
+	@EnableRedisWebSession
+	static class SessionRepositoryCustomizerConfiguration {
+
+		@Bean
+		@Order(0)
+		ReactiveSessionRepositoryCustomizer<ReactiveRedisSessionRepository> sessionRepositoryCustomizerOne() {
+			return (sessionRepository) -> sessionRepository.setDefaultMaxInactiveInterval(0);
+		}
+
+		@Bean
+		@Order(1)
+		ReactiveSessionRepositoryCustomizer<ReactiveRedisSessionRepository> sessionRepositoryCustomizerTwo() {
+			return (sessionRepository) -> sessionRepository
+					.setDefaultMaxInactiveInterval(MAX_INACTIVE_INTERVAL_IN_SECONDS);
 		}
 
 	}

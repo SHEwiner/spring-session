@@ -23,13 +23,13 @@ import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 
 /**
- * Base class for {@link RedisOperationsSessionRepository} integration tests.
+ * Base class for Redis integration tests.
  *
  * @author Vedran Pavic
  */
 public abstract class AbstractRedisITests {
 
-	private static final String DOCKER_IMAGE = "redis:5.0.5";
+	private static final String DOCKER_IMAGE = "redis:5.0.6";
 
 	protected static class BaseConfig {
 

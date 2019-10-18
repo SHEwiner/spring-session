@@ -23,48 +23,32 @@ import com.hazelcast.config.NetworkConfig;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 
-import org.springframework.util.SocketUtils;
-
 /**
  * Utility class for Hazelcast integration tests.
  *
  * @author Vedran Pavic
  */
-public final class HazelcastITestUtils {
+final class HazelcastITestUtils {
 
 	private HazelcastITestUtils() {
 	}
 
 	/**
 	 * Creates {@link HazelcastInstance} for use in integration tests.
-	 * @param port the port for Hazelcast to bind to
 	 * @return the Hazelcast instance
 	 */
-	public static HazelcastInstance embeddedHazelcastServer(int port) {
-		MapAttributeConfig attributeConfig = new MapAttributeConfig()
-				.setName(HazelcastSessionRepository.PRINCIPAL_NAME_ATTRIBUTE)
-				.setExtractor(PrincipalNameExtractor.class.getName());
-
+	static HazelcastInstance embeddedHazelcastServer() {
 		Config config = new Config();
-
 		NetworkConfig networkConfig = config.getNetworkConfig();
-
-		networkConfig.setPort(port);
-
+		networkConfig.setPort(0);
 		networkConfig.getJoin().getMulticastConfig().setEnabled(false);
-
-		config.getMapConfig(HazelcastSessionRepository.DEFAULT_SESSION_MAP_NAME).addMapAttributeConfig(attributeConfig)
-				.addMapIndexConfig(new MapIndexConfig(HazelcastSessionRepository.PRINCIPAL_NAME_ATTRIBUTE, false));
-
+		MapAttributeConfig attributeConfig = new MapAttributeConfig()
+				.setName(HazelcastIndexedSessionRepository.PRINCIPAL_NAME_ATTRIBUTE)
+				.setExtractor(PrincipalNameExtractor.class.getName());
+		config.getMapConfig(HazelcastIndexedSessionRepository.DEFAULT_SESSION_MAP_NAME)
+				.addMapAttributeConfig(attributeConfig).addMapIndexConfig(
+						new MapIndexConfig(HazelcastIndexedSessionRepository.PRINCIPAL_NAME_ATTRIBUTE, false));
 		return Hazelcast.newHazelcastInstance(config);
-	}
-
-	/**
-	 * Creates {@link HazelcastInstance} for use in integration tests.
-	 * @return the Hazelcast instance
-	 */
-	public static HazelcastInstance embeddedHazelcastServer() {
-		return embeddedHazelcastServer(SocketUtils.findAvailableTcpPort());
 	}
 
 }
